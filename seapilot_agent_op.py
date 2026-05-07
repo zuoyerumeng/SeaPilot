@@ -285,7 +285,7 @@ class VisualMonitor:
         self.client = openai.OpenAI(api_key=os.getenv("EDGE_VISION_API_KEY", "EMPTY"), base_url=self.base_url)
         print(f"[System] Using Monitor API: {self.base_url} model={self.model_name}")
 
-# 🔥 [修改] 增加 template 参数
+# Added template parameter for dynamic monitor prompt selection
     def predict_status(self, template: str, sub_goal: str, expectation: str, img: Image.Image, history: str) -> Tuple[Dict, int]:
         prompt = template.format(sub_goal=sub_goal, expectation=expectation, history=history)
         buf = io.BytesIO()
@@ -361,23 +361,23 @@ class TextExecutor:
             cls_full = getattr(elem, 'class_name', "View")
             cls = cls_full.split('.')[-1]
             
-            # 🔥 [新增] 针对滑动条提取 Bbox 坐标
-            # 只要类名里带 SeekBar 或者 Slider，就认为是需要物理操作的控件
+            # Extract bounding box coordinates for slider-like controls
+            # If class name contains SeekBar or Slider, treat it as a physical control
             is_slider = "SeekBar" in cls_full or "Slider" in cls_full
             box_info = ""
             
             if is_slider:
-                # 获取 AndroidWorld 元素的真实像素边界
+                # Read real pixel bounds from AndroidWorld element metadata
                 box = getattr(elem, 'bbox_pixels', None)
                 if box:
-                    # 格式: [x_min, y_min, x_max, y_max]
+                    # Format: [x_min, y_min, x_max, y_max]
                     box_info = f" Bbox:[{box.x_min},{box.y_min},{box.x_max},{box.y_max}]"
 
             info = f"[{i}] <{cls}>{box_info}" 
             if text: info += f" Text:\"{text}\""
             if desc: info += f" Desc:\"{desc}\""
             
-            # 过滤逻辑：保留有内容的，或者虽然没内容但是是 Slider 的
+            # Keep items with content, or slider controls even if text/desc is empty
             if text or desc or is_slider:
                 lines.append(info)
         
@@ -421,32 +421,32 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
         self.max_steps_per_subgoal = 5 
         self.action_history: List[str] = [] 
         
-        # 🔥 [新增] Replan 相关状态
+        # Replan-related state
         self.replan_count = 0
         self.max_replans = 1
-        self.execution_trace: List[Dict] = [] # 存储详细执行轨迹供反思
+        self.execution_trace: List[Dict] = [] # Store detailed execution trace for reflection
         
         self.metrics = AgentMetrics()
 
     def step(self, goal: str) -> base_agent.AgentInteractionResult:
-        # [A] 整个步骤开始计时
+        # [A] Start timing the whole step
         step_start_time = time.time()  
         self.metrics.edge_total_steps += 1
         
-        # --- 系统开销部分：环境感知 ---
+        # --- System overhead: environment observation ---
         state = self.get_post_transition_state()
 
         img = Image.fromarray(state.pixels)
         if img.mode in ("RGBA", "P"): img = img.convert("RGB")
 
-        # 强制压缩图片分辨率
+        # Enforce image downscaling
         max_dimension = 1024
         if max(img.size) > max_dimension:
             scale = max_dimension / max(img.size)
             new_size = (int(img.width * scale), int(img.height * scale))
             img = img.resize(new_size, Image.Resampling.LANCZOS)
         
-        # --- Cloud Planning (仅在首次触发) ---
+        # --- Cloud planning (first trigger only) ---
         if not self.plan:
             print(f"\n[Cloud] Logic Planning for goal: {goal}")
             planning_guidance = self.rule_manager.get_planning_guidance(goal, scope="op")
@@ -458,9 +458,9 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
             self.metrics.cloud_latency += p_latency
             print(f"[Cloud] Generated Plan: {json.dumps(self.plan, indent=2)}")
             self.current_step_index = 0
-            self.execution_trace = [] # 初始化 Trace
+            self.execution_trace = [] # Initialize trace
 
-        # 准备 step_info
+        # Prepare step_info
         total_subgoals = len(self.plan) if self.plan else 0
         current_subgoal_idx = self.current_step_index 
         
@@ -486,12 +486,12 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
         
         t_monitor_start = time.time()
 
-        # 🔥 [Dynamic Prompt Construction] 核心修改区
-        # 1. 初始化空规则
+        # Dynamic prompt construction
+        # 1) Initialize empty rule block
         dynamic_rules = ""
-        goal_lower = goal.lower() # 这里的 goal 是 step 函数入参的全局目标
+        goal_lower = goal.lower() # goal here is the global task goal passed to step()
 
-        # 2. 根据全局目标关键词注入规则
+        # 2) Inject rules based on global goal keywords
         if "brightness" in goal_lower:
             dynamic_rules += RULE_BRIGHTNESS
         
@@ -508,14 +508,14 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
         if monitor_rule_block:
             dynamic_rules += "\n" + monitor_rule_block
 
-        # 3. 替换 Base Prompt 中的占位符
-        # 注意：这里使用 replace 而不是 format，是为了避免与 Prompt 中其他的 {} 冲突，
-        # 且我们只替换 dynamic_rules，剩下的 sub_goal 等留给 monitor 内部去 format
+        # 3) Replace placeholder in base prompt
+        # Use replace (instead of format) to avoid conflicts with other {} tokens
+        # Only dynamic_rules is replaced here; sub_goal/expectation/history are formatted in monitor
         selected_template = MONITOR_NAV_BASE_PROMPT.replace("{dynamic_rules}", dynamic_rules)
 
-        # 4. 调用 Monitor，传入构建好的 Template
+        # 4) Call monitor with the constructed template
         monitor_res, m_tokens = self.monitor.predict_status(
-            template=selected_template,   # 🔥 传入新的 template
+            template=selected_template,   # pass dynamic template
             sub_goal=current_sub_goal, 
             expectation=current_expectation, 
             img=img, 
@@ -530,7 +530,7 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
             print(f"⚠️ [Monitor] Forced ONGOING: The FINAL subgoal cannot finish without action.")
             status = "ONGOING"
 
-        # 🔥 [新增] 记录 Monitor 思考（无论是否 Finished）
+        # Record monitor reasoning regardless of FINISHED/ONGOING
         current_trace_entry = {
             "step": self.metrics.edge_total_steps,
             "sub_goal": current_sub_goal,
@@ -547,11 +547,11 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
             self.subgoal_step_count = 0
             self.action_history = [] 
             
-            # 更新 Info
+            # Update info
             step_info["current_subgoal_idx"] = self.current_step_index
             step_info["is_last_subgoal"] = (total_subgoals > 0) and (self.current_step_index >= total_subgoals - 1)
             
-            # 将 Finished 状态也记录进 Trace
+            # Also record FINISHED status in trace
             current_trace_entry["action"] = "No Action (Monitor Finished)"
             self.execution_trace.append(current_trace_entry)
 
@@ -559,26 +559,26 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
             print(self.metrics) 
             return base_agent.AgentInteractionResult(False, {**step_info, "info": "Sub-goal finished", "skip_cost": True})
 # =================================================================
-        # 🔥【关键修复】：在执行动作前检查超时
+        # Key fix: check timeout before executing action
         # =================================================================
-        # 此时 Step 5 刚开始，subgoal_step_count 为 4。
-        # 如果 max=4，则 4 >= 4 成立，拦截 Executor，直接 Replan。
+        # At the beginning of step 5, subgoal_step_count can already be 4.
+        # If max=4, then 4 >= 4 holds, so skip executor and replan directly.
         if self.subgoal_step_count >= self.max_steps_per_subgoal:
             if self.replan_count < self.max_replans:
                 print(f"⚠️ [System] Subgoal Timeout ({self.subgoal_step_count}/{self.max_steps_per_subgoal})! Triggering Replan...")
 
-                # 1. 记录当前 Monitor 的观察结果到 Trace，这对 Replan 至关重要
-                # 因为没有执行动作，我们标记 Action 为 Timeout
+            # 1) Record current monitor observation into trace (critical for replanning)
+            # Since no action was executed, mark action as timeout
                 current_trace_entry["action"] = "No Action (Timeout Replan)"
                 self.execution_trace.append(current_trace_entry)
 
-                # 2. 格式化 Trace
+            # 2) Format trace
                 trace_str = self._format_trace_for_cloud()
                 replan_guidance = self.rule_manager.get_planning_guidance(goal, scope="op")
                 self.active_rule_ids = list(self.rule_manager.last_selected_ids)
                 merged_guidance = replan_guidance  # static GUIDANCE excluded; controlled entirely by rules.json via RULE_SCOPE_ROUND
                 
-                # 3. 调用 Replan
+                # 3) Call replan
                 new_plan, r_tokens, r_latency = self.planner.replan(
                     goal, 
                     self.plan, 
@@ -586,7 +586,7 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
                     guidance=merged_guidance
                 )
                 
-                # 4. 更新 Metrics & State
+                # 4) Update metrics and state
                 self.metrics.cloud_tokens += r_tokens
                 self.metrics.cloud_latency += r_latency
                 print(f"[Cloud] New Plan Applied: {json.dumps(new_plan, indent=2)}")
@@ -597,34 +597,33 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
                 self.execution_trace = []
                 self.replan_count += 1
                 
-                # 更新 info
+                # Update info
                 step_info["total_subgoals"] = len(self.plan)
                 step_info["current_subgoal_idx"] = 0
                 step_info["is_last_subgoal"] = (len(self.plan) > 0) and (0 >= len(self.plan) - 1)
 
-                # 🔥🔥🔥【新增修复】：在 return 前累加这一步消耗的总时间 🔥🔥🔥
-                # 这一步虽然没有执行 Action，但消耗了 Monitor 和 Cloud Replan 的时间，必须计入 Total Latency
+                # Add consumed time before return
+                # Even without action execution, monitor + cloud replan latency must be counted
                 self.metrics.edge_total_latency += (time.time() - step_start_time)
-                print(self.metrics) # 打印最新的 Metrics 方便调试
+                print(self.metrics) # Print latest metrics for debugging
                 
-                # 返回 skip_cost=True，这一步只算作“思考”，不计入 Runner 步数
+                # Return skip_cost=True: this step is considered planning-only
                 return base_agent.AgentInteractionResult(False, {**step_info, "info": "Replanned", "skip_cost": True})
 
             else:
-                # Replan 次数用尽 -> 任务失败
+                # Replan budget exhausted -> task failure
                 print(f"❌ [System] Max Replans ({self.max_replans}) reached. Task Failed.")
                 if self.active_rule_ids:
                     self.rule_manager.update_stats(self.active_rule_ids, success=False)
                 
-                # 补齐时间统计 (虽然失败了，但时间还是要算的)
+                # Finalize timing metrics even on failure
                 self.metrics.edge_total_latency += (time.time() - step_start_time)
                 print(self.metrics)
                 
-                # 更新 info，标记为失败
-                # 我们不需要改 index，直接 done 即可
-                step_info["is_last_subgoal"] = True # 逻辑上结束了
+                # Update info and mark logical end
+                step_info["is_last_subgoal"] = True # logically finished
                 
-                # 🔥 返回 done=True，结束任务
+                # Return done=True to terminate task
                 return base_agent.AgentInteractionResult(True,{**step_info, "info": "Task Failed: Max Replans Reached", "success": False, "skip_cost": True})
             
         # ==========================================
@@ -633,13 +632,12 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
         hint = monitor_res.get("suggestion", "")
         if hint: hint = f"Monitor says: {hint}. Reason: {monitor_res.get('reasoning','')}"
         
-        # 🔥🔥🔥 【插入这段代码】 🔥🔥🔥
+        # Debug: print serialized UI tree passed to executor
         print("\n" + "="*20 + " [Debug] UI Tree passed to Executor " + "="*20)
-        # 临时调用一次 _serialize_ui 看看实际传给大模型的是什么
+        # Preview exact UI payload sent to the model
         debug_ui_str = self.executor._serialize_ui(state.ui_elements)
         print(debug_ui_str)
         print("="*60 + "\n")
-        # 🔥🔥🔥 【插入结束】 🔥🔥🔥
 
         t_executor_start = time.time()
         action_res, e_tokens = self.executor.predict_action(current_sub_goal, state.ui_elements, hint)
@@ -648,7 +646,7 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
         
         final_action, action_desc = self._map_text_action(action_res, state.ui_elements)
 
-        # 🔥 [新增] 完善 Trace 记录 (把 index 换成 element text)
+        # Improve trace logging by replacing index with element text
         log_action = self._format_action_for_log(final_action, state.ui_elements)
         current_trace_entry["action"] = log_action
         self.execution_trace.append(current_trace_entry)
@@ -657,17 +655,15 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
             try:
                 print(f"🚀 [Action] Executing: {log_action}")
                 
-                # 🔥 [最终修正版：Subprocess 方案]
+                # Final approach: use subprocess for physical swipe
                 if final_action.get("action_type") == "swipe":
-                    # 1. 获取 raw_command (例如 "input swipe 100 200 ...")
-                    # 注意：根据你的代码逻辑，确认这里是用 'command' 还是 'raw_command'
-                    # 之前你的代码存的是 'command'
+                    # 1) Get raw command (for example: "input swipe 100 200 ...")
+                    # This implementation stores the command in the 'command' field
                     inner_cmd = final_action.get("command")
                     
                     if inner_cmd:
-                        # 2. 拼接完整的 adb 指令
-                        # 如果是模拟器/真机，通常不需要 -s <serial>，除非连了多台设备
-                        # ✅ 直接使用刚刚找到的路径
+                        # 2) Build full adb command
+                        # Usually -s <serial> is unnecessary unless multiple devices are connected
                         adb_bin = os.getenv("ADB_PATH", "adb")
 
                         full_cmd = f"{adb_bin} shell {inner_cmd}"
@@ -675,8 +671,8 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
                         print(f"   [System] 🚀 Physical Swipe via Subprocess: {full_cmd}")
                         
                         try:
-                            # 3. 调用系统命令行执行
-                            # shell=True 允许直接传字符串，虽然不安全但在 benchmark 里最方便
+                            # 3) Execute in system shell
+                            # shell=True allows direct string command execution
                             subprocess.run(full_cmd, shell=True, check=True, timeout=5)
                         except subprocess.CalledProcessError as e:
                             print(f"   [Error] ADB command failed: {e}")
@@ -686,7 +682,7 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
                         print("   [Error] Swipe action missing 'command' field!")
 
                 else:
-                    # 普通动作 (Click, Type, Scroll) 依然走官方通道
+                    # Standard actions (click/type/scroll) go through the official env channel
                     self.env.execute_action(json_action.JSONAction(**final_action))
                 self.action_history.append(action_desc)     
             except Exception as e:
@@ -697,14 +693,14 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
 
         self.subgoal_step_count += 1
         
-        # [A] 整个步骤计时结束
+        # [A] End timing for whole step
         step_duration = time.time() - step_start_time
         self.metrics.edge_total_latency += step_duration
         
         print(self.metrics)
         return base_agent.AgentInteractionResult(False, step_info)
     
-    # 🔥 [新增] 辅助函数：把 Trace 列表转成云端易读的字符串
+    # Helper: convert trace list into cloud-readable text
     def _format_trace_for_cloud(self) -> str:
         lines = []
         for t in self.execution_trace:
@@ -715,7 +711,7 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
             lines.append("")
         return "\n".join(lines)
 
-    # 🔥 [新增] 辅助函数：把 Action index 换成 text
+    # Helper: replace action index with readable target text
     def _format_action_for_log(self, action: Dict, ui_elements: List) -> Dict:
         if not action: return {"action_type": "None"}
         
@@ -723,17 +719,17 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
         idx = log_act.get("index")
         
         if isinstance(idx, int) and 0 <= idx < len(ui_elements):
-            # 获取元素名称
+            # Get element display name
             elem = ui_elements[idx]
             name = getattr(elem, 'text', "") or getattr(elem, 'content_description', "") or "Unknown Element"
-            # 替换 index 为 target
+            # Replace index with target
             log_act["target"] = f"{name} (Index {idx})"
             del log_act["index"]
         
         return log_act
 
     def _map_text_action(self, raw: Dict, ui_elements: List) -> Tuple[Optional[Dict], str]:
-        # [新增] 1. 自动解包
+        # 1) Auto-unpack nested wrappers
         if raw and "action" in raw and isinstance(raw["action"], dict):
             raw = raw["action"]
         if raw and "answer" in raw and isinstance(raw["answer"], dict):
@@ -782,51 +778,51 @@ class SeaPilotAgent(base_agent.EnvironmentInteractingAgent):
         if action_type == "navigate_home": return {"action_type": "navigate_home"}, "Pressed Home"
         if action_type == "navigate_back": return {"action_type": "navigate_back"}, "Pressed Back"
 
-        # 🔥 [新增] 处理 Swipe 动作逻辑
+        # Handle swipe action
         if action_type == "swipe":
             idx = raw.get("index")
             direction = raw.get("direction", "right").lower()
             
             if isinstance(idx, int) and 0 <= idx < len(ui_elements):
                 elem = ui_elements[idx]
-                # 获取刚才在 _serialize_ui 里不仅提取了，而且存在 elem 对象里的 bbox
+                # Read bbox metadata stored on the element by AndroidWorld
                 box = getattr(elem, 'bbox_pixels', None)
                 
                 if box:
-                    # 1. 计算中心点和宽高
+                    # 1) Compute center point and dimensions
                     center_x = int((box.x_min + box.x_max) / 2)
                     center_y = int((box.y_min + box.y_max) / 2)
                     width = box.x_max - box.x_min
                     height = box.y_max - box.y_min
                     
-                    # 2. 定义安全内缩 (Padding) - 防止滑出界
-                    pad_x = int(width * 0.05)  # 左右留 5%
-                    pad_y = int(height * 0.05) # 上下留 5%
+                    # 2) Define safe padding to avoid swiping outside bounds
+                    pad_x = int(width * 0.05)  # keep 5% left/right margin
+                    pad_y = int(height * 0.05) # keep 5% top/bottom margin
                     
-                    # 3. 初始化起点和终点 (默认是中心不动)
+                    # 3) Initialize start and end points (default: center)
                     start_x, start_y = center_x, center_y
                     end_x, end_y = center_x, center_y
                     
-                    # 4. 根据方向计算轨迹
-                    if direction == "right":  # 往右滑 (值变大)
+                    # 4) Compute trajectory based on direction
+                    if direction == "right":  # swipe right (increase value)
                         start_x = box.x_min + pad_x
                         end_x   = box.x_max
-                    elif direction == "left": # 往左滑 (值变小)
+                    elif direction == "left": # swipe left (decrease value)
                         start_x = box.x_max - pad_x
                         end_x   = box.x_min
-                    elif direction == "down": # 往下滑 (例如下拉刷新)
+                    elif direction == "down": # swipe down (for pull-down actions)
                         start_y = box.y_min + pad_y
                         end_y   = box.y_max
-                    elif direction == "up":   # 往上滑 (例如上滑解锁)
+                    elif direction == "up":   # swipe up (for upward gestures)
                         start_y = box.y_max - pad_y
                         end_y   = box.y_min
 
-                    # 5. 生成 ADB 指令
-                    # 持续 400ms 是比较像人类的手势
+                    # 5) Build adb command
+                    # 400ms produces a reasonably human-like gesture
                     cmd = f"input swipe {start_x} {start_y} {end_x} {end_y} 400"
  
                     return {
-                        "action_type": "swipe", # 特殊标记
+                        "action_type": "swipe", # special marker
                         "command": cmd
                     }, f"Swiping {direction} on SeekBar [{idx}]"
                 else:
