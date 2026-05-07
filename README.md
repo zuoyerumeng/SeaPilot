@@ -6,7 +6,7 @@ This repository contains the anonymized implementation of **SeaPilot**, a hierar
 
 ## 📂 Repository Structure & Functionality
 
-This codebase consists of four core components designed to handle different aspects of interaction:
+This codebase consists of core components designed to handle different aspects of interaction:
 
 - **`seapilot_agent_op.py`**  
   Implements the architecture and prompts for **Operation-Oriented Tasks** (pure UI manipulation without information extraction).
@@ -21,6 +21,9 @@ This codebase consists of four core components designed to handle different aspe
 
 - **`analyze_logs.py`**  
   Evaluation script used to calculate metrics and success rates across the 116 AndroidWorld task categories based on generated logs.
+
+- **`rule_manager.py`**  
+  Rule retrieval and selection module used by both OP/QA agents, including staged rule filtering and online rule statistics update.
 
 ---
 
@@ -60,6 +63,14 @@ cp run_seapilot.py /path/to/android_world/
 cp analyze_logs.py /path/to/android_world/
 ```
 
+#### 3.3 Move Rule Manager File
+
+Copy the rule manager implementation into the AndroidWorld rules directory:
+
+```bash
+cp rule_manager.py /path/to/android_world/android_world/agents/rules/
+```
+
 ---
 
 ## ⚙️ Configuration
@@ -86,6 +97,7 @@ Configure the following:
 - **LLM Setup**: Configure model selection and runtime settings
 - **Swipe Action Setup**: Set the `adb_bin` variable
   - This is required for executing physical swipe actions (e.g., brightness adjustment) via `subprocess`
+- **Rule Setup**: Ensure `rule_manager.py` and `rules.json` are both located under `android_world/android_world/agents/rules/`
 
 ---
 
