@@ -220,11 +220,27 @@ Output strictly in JSON format.
 """
 
 # Static dynamic rules for specific task types (injected into MONITOR_NAV_BASE_PROMPT)
-RULE_BRIGHTNESS = ""
+RULE_BRIGHTNESS = """
+- **Brightness Protocol**:
+    - **CRITICAL RULE**: Do NOT use the "Swipe" action until the Brightness Slider is explicitly visible.
+    1. **Visual Check**: Look for Brightness Slider 
+    2. **IF Brightness Slider is MISSING**: 
+    - The panel is likely only partially open. Suggest "SCROLL UP" again to fully expand the panel.
+    3. **IF Brightness Slider is VISIBLE**: 
+    - To Min: Suggest "Swipe LEFT"  on the Brightness Slider".
+    - To Max: Suggest "Swipe RIGHT" on the Brightness Slider".
+"""
 RULE_DELETE = """
 [Delete Rule]: To delete items, look for a Delete button, trash icon, or try Long Press to reveal delete options.
 """
-RULE_RESEND = ""
+RULE_RESEND = """
+** CRITICAL: RESEND TASKS **
+If goal is "Resend message":
+1. **TARGET**: Read text from the **RIGHT bottom-most (Blue/Colored)** bubble. IGNORE Left (Gray).
+2. **ACTION LOGIC**:
+   - IF History has "input_text": **Status=ONGOING**. Suggest: "Click SMS".
+   - ELSE: **Status=ONGOING**. Suggest: "Input text '[Text from Right Bubble]'".
+"""
 
 # ==========================================
 # 3. Cloud Planner
