@@ -51,15 +51,15 @@ class AgentMetrics:
 # ==========================================
 # 1. Configuration Area
 # ==========================================
-PLANNER_BASE_URL = os.environ.get("PLANNER_BASE_URL", "https://4.0.wokaai.com/v1")
-PLANNER_API_KEY = os.environ.get("PLANNER_API_KEY", "EMPTY")
-CLOUD_MODEL_NAME = os.environ.get("PLANNER_MODEL_NAME", "gpt-4-turbo-2024-04-09")
-MONITOR_MODEL_PATH = os.environ.get("MONITOR_VL_MODEL", "Qwen/Qwen3-VL-2B-Instruct")
-EXECUTOR_MODEL_PATH = os.environ.get("EXECUTOR_MODEL_NAME", "Qwen3-4B-Instruct")
-EDGE_TEXT_BASE_URL = os.environ.get("EDGE_TEXT_BASE_URL", "http://127.0.0.1:18085/v1")
-EDGE_TEXT_MODEL = os.environ.get("EXECUTOR_MODEL_NAME", "Qwen3-4B-Instruct")
-EDGE_VISION_BASE_URL = os.environ.get("EDGE_VISION_BASE_URL", "http://127.0.0.1:18084/v1")
-EDGE_VISION_MODEL = os.environ.get("EDGE_VISION_MODEL", "Qwen3-VL-2B-Instruct")
+PLANNER_BASE_URL = os.environ.get("PLANNER_BASE_URL", "http://localhost:PORT/v1")
+PLANNER_API_KEY = os.environ.get("PLANNER_API_KEY", "YOUR_API_KEY")
+CLOUD_MODEL_NAME = os.environ.get("PLANNER_MODEL_NAME", "planner-model-name")
+MONITOR_MODEL_PATH = os.environ.get("MONITOR_VL_MODEL", "vision-model-path-or-name")
+EXECUTOR_MODEL_PATH = os.environ.get("EXECUTOR_MODEL_NAME", "executor-model-path-or-name")
+EDGE_TEXT_BASE_URL = os.environ.get("EDGE_TEXT_BASE_URL", "http://localhost:PORT/v1")
+EDGE_TEXT_MODEL = os.environ.get("EXECUTOR_MODEL_NAME", "edge-text-model-name")
+EDGE_VISION_BASE_URL = os.environ.get("EDGE_VISION_BASE_URL", "http://localhost:PORT/v1")
+EDGE_VISION_MODEL = os.environ.get("EDGE_VISION_MODEL", "edge-vision-model-name")
 
 # ==========================================
 # 2. Prompts

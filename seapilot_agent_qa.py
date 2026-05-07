@@ -55,16 +55,16 @@ class AgentMetrics:
 # ==========================================
 # 1. Configuration Area
 # ==========================================
-BASE_URL = os.getenv("PLANNER_BASE_URL", os.getenv("EDGE_TEXT_BASE_URL", "http://127.0.0.1:18085/v1"))
-API_KEY = os.getenv("PLANNER_API_KEY", os.getenv("EDGE_TEXT_API_KEY", "EMPTY"))
+BASE_URL = os.getenv("PLANNER_BASE_URL", os.getenv("EDGE_TEXT_BASE_URL", "http://localhost:PORT/v1"))
+API_KEY = os.getenv("PLANNER_API_KEY", os.getenv("EDGE_TEXT_API_KEY", "YOUR_API_KEY"))
 
-CLOUD_MODEL_NAME = os.getenv("PLANNER_MODEL_NAME", "gpt-4-turbo-2024-04-09")
-MONITOR_MODEL_PATH = os.getenv("MONITOR_MODEL_PATH", "Qwen/Qwen3-VL-2B-Instruct")
-EXECUTOR_MODEL_PATH = os.getenv("EXECUTOR_MODEL_PATH", "Qwen2.5-3B-Instruct")
-EDGE_TEXT_BASE_URL = os.getenv("EDGE_TEXT_BASE_URL", "http://127.0.0.1:18085/v1")
-EDGE_TEXT_MODEL = os.getenv("EXECUTOR_MODEL_NAME", "Qwen3-4B-Instruct")
-EDGE_VISION_BASE_URL = os.getenv("EDGE_VISION_BASE_URL", "http://127.0.0.1:18084/v1")
-EDGE_VISION_MODEL = os.getenv("EDGE_VISION_MODEL", "Qwen3-VL-2B-Instruct")
+CLOUD_MODEL_NAME = os.getenv("PLANNER_MODEL_NAME", "planner-model-name")
+MONITOR_MODEL_PATH = os.getenv("MONITOR_MODEL_PATH", "vision-model-path-or-name")
+EXECUTOR_MODEL_PATH = os.getenv("EXECUTOR_MODEL_PATH", "executor-model-path-or-name")
+EDGE_TEXT_BASE_URL = os.getenv("EDGE_TEXT_BASE_URL", "http://localhost:PORT/v1")
+EDGE_TEXT_MODEL = os.getenv("EXECUTOR_MODEL_NAME", "edge-text-model-name")
+EDGE_VISION_BASE_URL = os.getenv("EDGE_VISION_BASE_URL", "http://localhost:PORT/v1")
+EDGE_VISION_MODEL = os.getenv("EDGE_VISION_MODEL", "edge-vision-model-name")
 
 # ==========================================
 # 2. Prompts
